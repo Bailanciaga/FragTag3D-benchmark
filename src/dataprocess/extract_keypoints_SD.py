@@ -495,6 +495,39 @@ def visualize_matches(extractor1, extractor2, n_points, n_scales, threshold, num
     fig.show()
 
 
+def extract_key_point_by_dir(dataset_dir, n_keypoints, keypoint_radius, r_vals, nms_rad, useflags):
+    fragments = os.listdir(dataset_dir)
+    fragments = [x for x in fragments if x.endswith(".npy")]
+
+    # f_args = [] # it is for multi thread method
+    num_features = 3  # the default value of this parameter is 3
+    threshold = 0.2  # the default value of this parameter is 0.2
+    k = 200  # the default value of this parameter is 150 [HT is 200]
+    lbd = 2  # the default value of this parameter is 2
+    nms = True  # the default value of this parameter is True
+    useflags = True
+
+    for fragment in fragments:
+        print(f"Fragment: {fragment}")
+        fragment_path = os.path.join(dataset_dir, fragment)
+        keypoints_dir = os.path.join(dataset_dir, "keypoints")
+        if not os.path.exists(keypoints_dir):
+            os.mkdir(keypoints_dir)
+
+        output_path = os.path.join(keypoints_dir, fragment)
+
+        # single thread
+        f(fragment_path,
+          output_path,
+          num_features,
+          keypoint_radius,
+          r_vals,
+          n_keypoints,
+          k, lbd,
+          nms,
+          nms_rad,
+          useflags)
+
 import shutil
 
 if __name__ == "__main__":

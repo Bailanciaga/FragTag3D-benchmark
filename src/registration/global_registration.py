@@ -1,3 +1,5 @@
+import shutil
+
 import numpy as np
 import open3d as o3d
 import open3d as o3d
@@ -6,9 +8,38 @@ import pickle
 import frag_relation_graph as frg
 import os
 import matplotlib.pyplot as plt
+from src.dataprocess import open3d_resample,extract_keypoints_SD
 
 folder_path = '../../data/TUWien/brick/'
 ply_files = [f for f in os.listdir(folder_path) if f.endswith('.ply')]
+
+
+def dowmSample_and_extract(path, params=None):
+    print("DownSampling....")
+    output_path = os.path.join(path, 'npy')
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+        print(f"'{output_path}' 已被创建。")
+    else:
+        print(f"'{output_path}' 已存在,正在重新创建。")
+        shutil.rmtree(output_path)
+        os.makedirs(output_path)
+    open3d_resample.convert_pointclouds(path, output_path)
+
+    if params == None:
+        n_keypoints = 512
+        keypoint_radius = 0.04
+        r_vals = [0.08, 0.09, 0.10, 0.11, 0.12]
+        nms_rad = 0.04
+    else:
+        n_keypoints = params["n_keypoints"]
+        keypoint_radius = params["keypoint_radius"]
+        r_vals = params["r_vals"]
+        nms_rad = params["nms_rad"]
+    print("Extracting Key Points...")
+    # TODO change the file address to windows format
+    extract_keypoints_SD.extract_key_point_by_dir(output_path, n_keypoints, keypoint_radius, r_vals, nms_rad, useflags=True)
+
 
 def extract_by_color(point_cloud, target_color):
     colors = np.asarray(point_cloud.colors)
@@ -129,7 +160,7 @@ for edge in dfs_tree.edges():
     target = pc_dict[node2]
 
     # 提取关键点，这里假设你有一个函数 `extract_keypoints` 来执行此操作
-    keypoints_source, keypoints_target = extract_keypoints(source, target, pc_dict, graph)
+    # keypoints_source, keypoints_target = extract_keypoints(source, target, pc_dict, graph)
 
     # 使用点云配准计算变换矩阵
     # 这里假设你有一个函数 `register_point_clouds` 来完成这个工作

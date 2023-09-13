@@ -2,7 +2,7 @@ import numpy as np
 import open3d as o3d
 import os
 import plotly.graph_objects as go
-from plyfile import PlyData
+
 
 """
 Script to convert Pointclouds with high density
@@ -22,11 +22,11 @@ Loops over all subfolders of input_folder and outputs to same folder in output_f
 Fragments with <1000 points after downsampling won't get downsampled
 """
 
-root = "./"
-#input_folder = f"{root}/obj"  # should contain pointclouds in .obj format
-#output_folder = f"{root}/npy"  # will be generated for output
-input_folder = f"/home/suhaot/PycharmProjects/3d-fracture-reassembly/dataset/TUWien"
-output_folder = f"/home/suhaot/PycharmProjects/3d-fracture-reassembly/dataset_kp/TUWien_seg"
+# root = "./"
+# #input_folder = f"{root}/obj"  # should contain pointclouds in .obj format
+# #output_folder = f"{root}/npy"  # will be generated for output
+# input_folder = f"/home/suhaot/PycharmProjects/3d-fracture-reassembly/dataset/TUWien"
+# output_folder = f"/home/suhaot/PycharmProjects/3d-fracture-reassembly/dataset_kp/TUWien_seg"
 sample_size = 0.01
 
 
@@ -139,5 +139,5 @@ def _downsample_and_save(folder, pc_dict, output_root, scale=2):
     fig.write_html(os.path.join(output_root, folder, "scatter_plot.html"))
 
 
-if __name__ == "__main__":
-    convert_pointclouds(input_folder, output_folder)
+# if __name__ == "__main__":
+#     convert_pointclouds(input_folder, output_folder)
