@@ -1,7 +1,9 @@
 # Author: suhaot
-# Date: 2023/9/10
+# Date: 2023/9/14
 # Description: get_descriptor_pairs
 import numpy as np
+import networkx as nx
+import itertools
 from scipy.spatial.distance import cdist
 def get_descriptor_pairs_classical(kp1, kp2):
     # Find pairs of keypoints of two fragments with similar descriptors
@@ -24,8 +26,8 @@ def get_descriptor_pairs_classical(kp1, kp2):
     # params used in keypoint extraction
 
     desc_mat_sz = desc_features * desc_features
-    X = kp1['gt']['features']
-    Y = kp2['gt']['features']
+    X = kp1[:, 6:]
+    Y = kp2[:, 6:]
 
     # Multi-scale average of Frobenius Norm
     k = 1
@@ -69,15 +71,16 @@ def get_descriptor_pairs_classical(kp1, kp2):
     gt_dist = np.zeros((Array.shape[0],))
 
     # Calculate ground truth distance
-    for k in range(len(d_dist)):
-        A = [kp1['gt']['x'][d_pairs[k, 0]], kp1['gt']['y'][d_pairs[k, 0]],
-             kp1['gt']['z'][d_pairs[k, 0]]]
-        B = [kp2['gt']['x'][d_pairs[k, 1]], kp2['gt']['y'][d_pairs[k, 1]],
-             kp2['gt']['z'][d_pairs[k, 1]]]
-        gt_dist[k] = np.linalg.norm(np.array(A) - np.array(B))
+    # for k in range(len(d_dist)):
+    #     A = [kp[index1]['gt']['x'][d_pairs[k, 0]], kp[index1]['gt']['y'][d_pairs[k, 0]],
+    #          kp[index1]['gt']['z'][d_pairs[k, 0]]]
+    #     B = [kp[index2]['gt']['x'][d_pairs[k, 1]], kp[index2]['gt']['y'][d_pairs[k, 1]],
+    #          kp[index2]['gt']['z'][d_pairs[k, 1]]]
+    #     gt_dist[k] = np.linalg.norm(np.array(A) - np.array(B))
     if print_flag:
         print('Point 1, point 2, distance (feature space), distance (ground truth)')
-        print(np.concatenate((Array, gt_dist.reshape(-1, 1)), axis=1))
+        # print(np.concatenate((Array, gt_dist.reshape(-1, 1)), axis=1))
+        print(np.concatenate(Array))
         print('')
 
-    return d_pairs, d_dist, gt_dist
+    return d_pairs, d_dist

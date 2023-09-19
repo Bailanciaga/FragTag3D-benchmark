@@ -3,3 +3,4 @@
 # Description: __init__
 from . import tools
 from . import open3d_resample
+from . import generate_rand_pose

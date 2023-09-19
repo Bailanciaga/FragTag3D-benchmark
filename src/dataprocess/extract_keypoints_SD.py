@@ -126,13 +126,14 @@ class Extractor(object):
         point_cloud = fragment[:, :3]
         # self.point_cloud = point_cloud
         normals = fragment[:, 3:6]
-        colors = (fragment[:, 6:9] * 255).astype(np.uint8)
+        colors = fragment[:, 6:9]
         if self.useflags:
             # 创建一个布尔掩码，检查colors中的每一行是否不与[255, 255, 255]相匹配
-            mask = ~np.all(colors == [255, 255, 255], axis=1)
+            mask = ~np.all(colors == [1, 1, 1], axis=1)
             # 使用掩码筛选point_cloud和normals
             point_cloud = point_cloud[mask]
             normals = normals[mask]
+            colors = colors[mask]
             self.point_cloud = point_cloud
         else:
             self.point_cloud = point_cloud
@@ -219,20 +220,22 @@ class Extractor(object):
         output_matrix = np.zeros(
             (
                 len(keypoint_indices),
-                3 + 3 + n_features_used * n_features_used * len(self.r_vals),
+                3 + 3 + 3 + n_features_used * n_features_used * len(self.r_vals),  # 添加了额外的3个空间来保存颜色信息
             )
         )
 
         print("Extracting features")
         # For each keypoint
         for n_keypoint, keypoint_index in enumerate(tqdm(keypoint_indices)):
-            # Get keypoint and normal of the keypoint
+            # Get keypoint, normal of the keypoint and color of the keypoint
             keypoint = point_cloud[keypoint_index]
             keypoint_normal = normals[keypoint_index]
+            keypoint_color = colors[keypoint_index]  # 获取关键点的颜色
 
             # Set output matrix
             output_matrix[n_keypoint, :3] = keypoint
             output_matrix[n_keypoint, 3:6] = keypoint_normal
+            output_matrix[n_keypoint, 6:9] = keypoint_color  # 保存关键点的颜色
             keypoint_cov_mats = []
 
             # For each radius r, compute the matrix with the features
@@ -293,8 +296,8 @@ class Extractor(object):
                 keypoint_cov_mats.append(log_C_r)
                 output_matrix[
                 n_keypoint,
-                6
-                + r_idx * n_features_used * n_features_used: 6
+                9
+                + r_idx * n_features_used * n_features_used: 9
                                                              + (r_idx + 1) * n_features_used * n_features_used,
                 ] = log_C_r.ravel()
             self.cov_mats.append(keypoint_cov_mats)

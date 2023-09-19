@@ -1,3 +1,5 @@
+import shutil
+
 import numpy as np
 import open3d as o3d
 import os
@@ -30,19 +32,19 @@ Fragments with <1000 points after downsampling won't get downsampled
 sample_size = 0.01
 
 
-def convert_pointclouds(input_folder, output_folder):
-    """
-    Entry point to loop over subfolders
-    """
-    folders = [
-        x for x in os.listdir(input_folder) if os.path.isdir(os.path.join(input_folder, x))
-    ]
-    print(f"Folders: {folders}")
-    for dir in folders:
-        collect_pointclouds(dir, input_folder, output_folder)
+# def convert_pointclouds(input_folder, output_folder):
+#     """
+#     Entry point to loop over subfolders
+#     """
+#     folders = [
+#         x for x in os.listdir(input_folder) if os.path.isdir(os.path.join(input_folder, x))
+#     ]
+#     print(f"Folders: {folders}")
+#     for dir in folders:
+#         collect_pointclouds(dir, input_folder, output_folder)
 
 
-def collect_pointclouds(dir, input_root, output_root):
+def collect_pointclouds(inputpath):
     """
     convert and save all pointcloud data from a single folder
     """
@@ -52,10 +54,10 @@ def collect_pointclouds(dir, input_root, output_root):
     b_max = np.zeros((3,))
     b_min = np.zeros((3,))
     print(f"Object: {dir}")
-    for x in os.listdir(os.path.join(input_root, dir)):
+    for x in os.listdir(inputpath):
         if x.endswith('.obj'):
             file = x[:-4]
-            mesh = o3d.io.read_triangle_mesh(os.path.join(input_root, dir, f"{file}.obj"))
+            mesh = o3d.io.read_triangle_mesh(os.path.join(inputpath, f"{file}.obj"))
             pc = o3d.geometry.PointCloud()
             pc.points = mesh.vertices
             pc.normals = mesh.vertex_normals
@@ -64,31 +66,36 @@ def collect_pointclouds(dir, input_root, output_root):
             pc_dict[file] = pc
         if x.endswith('.ply'):
             file = x[:-4]
-            pc = o3d.io.read_point_cloud(os.path.join(input_root, dir, f"{file}.ply"))
+            pc = o3d.io.read_point_cloud(os.path.join(inputpath, f"{file}.ply"))
             color = np.asarray(pc.colors)
             b_max = np.max([pc.get_max_bound(), b_max], axis=0)
             b_min = np.min([pc.get_min_bound(), b_min], axis=0)
             pc_dict[file] = pc
         if x.endswith('.pcd'):
             file = x[:-4]
-            pc = o3d.io.read_point_cloud(os.path.join(input_root, dir, f"{file}.pcd"))
+            pc = o3d.io.read_point_cloud(os.path.join(inputpath, f"{file}.pcd"))
             b_max = np.max([pc.get_max_bound(), b_max], axis=0)
             b_min = np.min([pc.get_min_bound(), b_min], axis=0)
             pc_dict[file] = pc
     scale = np.max(b_max - b_min)
     if scale < 0.01:
-        assert f"SCALE TOO SMALL -- Folder: {dir}"
+        assert f"SCALE TOO SMALL -- Folder: {inputpath}"
 
-    _downsample_and_save(dir, pc_dict, output_root, scale)
+    return _downsample_and_save(inputpath, pc_dict, scale)
 
-
-def _downsample_and_save(folder, pc_dict, output_root, scale=2):
+def _downsample_and_save(inputpath, pc_dict, scale=2):
     """
     helper for downsamplng and plotting
     """
     # Resample and save to .npy, also output a html scatterplot for easy visualization
-    if not os.path.exists(os.path.join(output_root, folder)):
-        os.makedirs(os.path.join(output_root, folder))
+    outputpath = os.path.join(inputpath, 'npy')
+    if not os.path.exists(outputpath):
+        os.makedirs(outputpath)
+        print(f"'{outputpath}' 已被创建。")
+    else:
+        print(f"'{outputpath}' 已存在,正在重新创建。")
+        shutil.rmtree(outputpath)
+        os.makedirs(outputpath)
 
     fig = go.Figure()
     for file, pcloud in pc_dict.items():
@@ -116,7 +123,7 @@ def _downsample_and_save(folder, pc_dict, output_root, scale=2):
             )
         )
 
-        out_file = os.path.join(output_root, folder, file)
+        out_file = os.path.join(outputpath, file)
         np.save(out_file, data)
 
     fig.update_layout(
@@ -136,8 +143,8 @@ def _downsample_and_save(folder, pc_dict, output_root, scale=2):
             aspectmode='cube'
         )
     )
-    fig.write_html(os.path.join(output_root, folder, "scatter_plot.html"))
-
+    fig.write_html(os.path.join(outputpath, "scatter_plot.html"))
+    return outputpath
 
 # if __name__ == "__main__":
 #     convert_pointclouds(input_folder, output_folder)

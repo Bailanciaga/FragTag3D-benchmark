@@ -7,24 +7,20 @@ import networkx as nx
 import pickle
 import frag_relation_graph as frg
 import os
+import matplotlib
 import matplotlib.pyplot as plt
 from src.dataprocess import open3d_resample,extract_keypoints_SD
+from src.registration import get_descriptor_pairs
+from src.dataprocess import generate_rand_pose
+from src.registration import registration_use_ransac
 
-folder_path = '../../data/TUWien/brick/'
-ply_files = [f for f in os.listdir(folder_path) if f.endswith('.ply')]
+inputpath = '../../data/TUWien/brick/'
+# matplotlib.use('Qt5Agg')
 
 
-def dowmSample_and_extract(path, params=None):
+def dowmSample_and_extract(inputpath, params=None):
     print("DownSampling....")
-    output_path = os.path.join(path, 'npy')
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
-        print(f"'{output_path}' 已被创建。")
-    else:
-        print(f"'{output_path}' 已存在,正在重新创建。")
-        shutil.rmtree(output_path)
-        os.makedirs(output_path)
-    open3d_resample.convert_pointclouds(path, output_path)
+    output_path = open3d_resample.collect_pointclouds(inputpath)
 
     if params == None:
         n_keypoints = 512
@@ -39,7 +35,7 @@ def dowmSample_and_extract(path, params=None):
     print("Extracting Key Points...")
     # TODO change the file address to windows format
     extract_keypoints_SD.extract_key_point_by_dir(output_path, n_keypoints, keypoint_radius, r_vals, nms_rad, useflags=True)
-
+    return output_path
 
 def extract_by_color(point_cloud, target_color):
     colors = np.asarray(point_cloud.colors)
@@ -63,63 +59,60 @@ def extract_keypoints(pc1, pc2, pc_dict, graph):
     return keypoints_pc1, keypoints_pc2
 
 
-def register_point_clouds(source, target, threshold=0.02, trans_init=None):
-    """
-    使用ICP配准两个点云。
+# def register_point_clouds(source, target, threshold=0.02, trans_init=None):
+#     """
+#     使用ICP配准两个点云。
+#
+#     参数:
+#     - source: 源点云 (需要被变换的点云)
+#     - target: 目标点云
+#     - threshold: 用于寻找对应关系的距离阈值
+#     - trans_init: 初始变换矩阵
+#
+#     返回:
+#     - 点云配准后的变换矩阵
+#     """
+#
+#     # 如果未提供初始变换矩阵，使用单位矩阵作为初始变换
+#     if trans_init is None:
+#         trans_init = np.eye(4)
+#
+#     # 使用ICP进行点云配准
+#     reg_p2p = o3d.pipelines.registration.registration_icp(
+#         source, target, threshold, trans_init,
+#         o3d.pipelines.registration.TransformationEstimationPointToPoint()
+#     )
+#
+#     # 返回最优变换矩阵
+#     return reg_p2p.transformation
 
-    参数:
-    - source: 源点云 (需要被变换的点云)
-    - target: 目标点云
-    - threshold: 用于寻找对应关系的距离阈值
-    - trans_init: 初始变换矩阵
+def npy_visualization(pc_data, kp_data):
+    pc = o3d.geometry.PointCloud()
+    pc.points = o3d.utility.Vector3dVector(pc_data[:, :3])
+    pc.normals = o3d.utility.Vector3dVector(pc_data[:, 3:6])
+    pc.colors = o3d.utility.Vector3dVector(np.ones((len(pc_data), 3)))
 
-    返回:
-    - 点云配准后的变换矩阵
-    """
+    kp = o3d.geometry.PointCloud()
+    kp.points = o3d.utility.Vector3dVector(kp_data[:, :3])
+    kp.normals = o3d.utility.Vector3dVector(kp_data[:, 3:6])
+    kp.colors = o3d.utility.Vector3dVector(kp_data[:, 6:9])
 
-    # 如果未提供初始变换矩阵，使用单位矩阵作为初始变换
-    if trans_init is None:
-        trans_init = np.eye(4)
+    # 创建可视化器并添加两个点云
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
 
-    # 使用ICP进行点云配准
-    reg_p2p = o3d.pipelines.registration.registration_icp(
-        source, target, threshold, trans_init,
-        o3d.pipelines.registration.TransformationEstimationPointToPoint()
-    )
+    opt = vis.get_render_option()
+    opt.background_color = np.asarray([1, 1, 1])
+    opt.point_size = 2  # 设置点大小
 
-    # 返回最优变换矩阵
-    return reg_p2p.transformation
-
-
-def random_transformation():
-    """生成随机的旋转和平移矩阵"""
-
-    # 生成随机旋转矩阵
-    rot = o3d.geometry.get_rotation_matrix_from_xyz(
-        np.random.uniform(low=-np.pi, high=np.pi, size=3)
-    )
-
-    # 生成随机平移向量
-    trans = np.random.uniform(low=-0.5, high=0.5, size=3)
-
-    # 合成4x4的变换矩阵
-    transform = np.eye(4)
-    transform[:3, :3] = rot
-    transform[:3, 3] = trans
-
-    return transform
-
-
-# 对点云添加随机的旋转和平移
-def perturb_pointcloud(point_cloud):
-    """给点云添加随机旋转和平移"""
-    transform = random_transformation()
-    point_cloud.transform(transform)
-    return point_cloud
+    vis.add_geometry(pc)
+    vis.add_geometry(kp)
+    vis.run()
+    vis.destroy_window()
 
 
 # 加载之前保存的数据
-graph, ply_files_dict = frg.create_graph(folder_path)
+graph, ply_files_dict, edge_color_map = frg.create_graph(inputpath)
 
 # 使用DFS创建生成树
 dfs_tree = nx.dfs_tree(graph)
@@ -129,42 +122,50 @@ plt.figure(figsize=(12, 8))
 
 # 使用networkx的draw函数绘制生成树
 pos = nx.spring_layout(dfs_tree)  # 使用spring_layout布局，你也可以更改为其他布局
-nx.draw(dfs_tree, pos, with_labels=True, node_color="skyblue", node_size=1500, width=2, edge_color="gray", font_size=15)
+nx.draw(dfs_tree, pos, with_labels=True, node_color="skyblue", node_size=1500, width=4, edge_color="gray", font_size=15)
 
 # 添加标题和显示图形
 plt.title("DFS Tree Visualization")
 plt.show()
 
+#下采样、转换格式并提取关键点
+# outputpath = dowmSample_and_extract(inputpath)
 
-# 初始化一个字典来存储变换矩阵
-transformation_matrices = {}
+pc_files = [f for f in os.listdir('/home/suhaot/PycharmProjects/FragTag3D/data/TUWien/brick/npy') if f.endswith('.npy')]
+kp_files = [f for f in os.listdir(os.path.join('/home/suhaot/PycharmProjects/FragTag3D/data/TUWien/brick/npy', 'keypoints')) if f.endswith('.npy')]
+
+# 初始化一个字典来存储随机变换矩阵 以便后续验证用
+transformation_random_matrices = {}
 
 # 初始化一个字典来存储节点名字和随机旋转后的ply对象
-pc_dict = {}
-combined_rand_point_cloud = o3d.geometry.PointCloud()
-for file in ply_files:
-    full_path = os.path.join(folder_path, file)
-    point_cloud = o3d.io.read_point_cloud(full_path)
-    point_cloud = perturb_pointcloud(point_cloud)
-    pc_dict[os.path.basename(file)] = point_cloud
-    combined_rand_point_cloud += point_cloud
+pcrp_dict = {}
+kprp_dict = {}
 
-o3d.visualization.draw_geometries([combined_rand_point_cloud])
+combined_rand_pointcloud = np.empty((0,9))
+combined_rand_keypoint = np.empty((0,9))
+for file in pc_files:
+    pc_path = os.path.join('/home/suhaot/PycharmProjects/FragTag3D/data/TUWien/brick/npy', file)
+    kp_path = os.path.join('/home/suhaot/PycharmProjects/FragTag3D/data/TUWien/brick/npy', 'keypoints', file)
+    pcrp, kprp, transform_matrix = generate_rand_pose.apply_transform(pc_path, kp_path)
+    pcrp_dict[os.path.basename(file).split('.')[0]] = pcrp
+    kprp_dict[os.path.basename(file).split('.')[0]] = kprp
+    combined_rand_pointcloud = np.vstack((combined_rand_pointcloud, pcrp))
+    combined_rand_keypoint = np.vstack((combined_rand_keypoint, kprp[:, :9]))
 
+npy_visualization(combined_rand_pointcloud, combined_rand_keypoint)
+
+transformation_matrices = {}
 # 遍历生成树的每条边，执行点云配准
 for edge in dfs_tree.edges():
     node1, node2 = edge
 
     # 读取两个点云
-    source = pc_dict[node1]
-    target = pc_dict[node2]
+    kp1 = kprp_dict[node1]
+    kp2 = kprp_dict[node2]
 
-    # 提取关键点，这里假设你有一个函数 `extract_keypoints` 来执行此操作
-    # keypoints_source, keypoints_target = extract_keypoints(source, target, pc_dict, graph)
-
+    d_pairs, d_dist = get_descriptor_pairs.get_descriptor_pairs_classical(kp1, kp2)
     # 使用点云配准计算变换矩阵
-    # 这里假设你有一个函数 `register_point_clouds` 来完成这个工作
-    transformation = register_point_clouds(keypoints_source, keypoints_target)
+    R, T = registration_use_ransac.assy_use_ransac(kp1, kp2, d_pairs, d_dist)
 
     # 保存变换矩阵
     transformation_matrices[edge] = transformation
