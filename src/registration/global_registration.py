@@ -15,7 +15,7 @@ from src.dataprocess import generate_rand_pose
 from src.registration import registration_use_ransac
 
 inputpath = '../../data/TUWien/brick/'
-# matplotlib.use('Qt5Agg')
+# inputpath = '../../data/thingi10k/41272_5_seed_1/'
 
 
 def dowmSample_and_extract(inputpath, params=None):
@@ -24,9 +24,9 @@ def dowmSample_and_extract(inputpath, params=None):
 
     if params == None:
         n_keypoints = 512
-        keypoint_radius = 0.04
+        keypoint_radius = 0.1
         r_vals = [0.08, 0.09, 0.10, 0.11, 0.12]
-        nms_rad = 0.04
+        nms_rad = 0.1
     else:
         n_keypoints = params["n_keypoints"]
         keypoint_radius = params["keypoint_radius"]
@@ -110,6 +110,19 @@ def npy_visualization(pc_data, kp_data):
     vis.run()
     vis.destroy_window()
 
+def transform_point_cloud(pc, R, T):
+    # 构建变换矩阵
+    transform = np.eye(4)
+    transform[0:3, 0:3] = R
+    transform[0:3, 3] = T
+
+    # 将点云转化为齐次坐标
+    homogenous_pc = np.ones((pc.shape[0], 4))
+    homogenous_pc[:, 0:3] = pc
+
+    # 应用变换
+    transformed_pc = homogenous_pc.dot(transform.T)
+    return transformed_pc[:, 0:3]
 
 # 加载之前保存的数据
 graph, ply_files_dict, edge_color_map = frg.create_graph(inputpath)
@@ -129,13 +142,10 @@ plt.title("DFS Tree Visualization")
 plt.show()
 
 #下采样、转换格式并提取关键点
-# outputpath = dowmSample_and_extract(inputpath)
+outputpath = dowmSample_and_extract(inputpath)
 
-pc_files = [f for f in os.listdir('/home/suhaot/PycharmProjects/FragTag3D/data/TUWien/brick/npy') if f.endswith('.npy')]
-kp_files = [f for f in os.listdir(os.path.join('/home/suhaot/PycharmProjects/FragTag3D/data/TUWien/brick/npy', 'keypoints')) if f.endswith('.npy')]
-
-# 初始化一个字典来存储随机变换矩阵 以便后续验证用
-transformation_random_matrices = {}
+pc_files = [f for f in os.listdir(outputpath) if f.endswith('.npy')]
+kp_files = [f for f in os.listdir(os.path.join(outputpath, 'keypoints')) if f.endswith('.npy')]
 
 # 初始化一个字典来存储节点名字和随机旋转后的ply对象
 pcrp_dict = {}
@@ -144,8 +154,8 @@ kprp_dict = {}
 combined_rand_pointcloud = np.empty((0,9))
 combined_rand_keypoint = np.empty((0,9))
 for file in pc_files:
-    pc_path = os.path.join('/home/suhaot/PycharmProjects/FragTag3D/data/TUWien/brick/npy', file)
-    kp_path = os.path.join('/home/suhaot/PycharmProjects/FragTag3D/data/TUWien/brick/npy', 'keypoints', file)
+    pc_path = os.path.join(outputpath, file)
+    kp_path = os.path.join(outputpath, 'keypoints', file)
     pcrp, kprp, transform_matrix = generate_rand_pose.apply_transform(pc_path, kp_path)
     pcrp_dict[os.path.basename(file).split('.')[0]] = pcrp
     kprp_dict[os.path.basename(file).split('.')[0]] = kprp
@@ -155,38 +165,80 @@ for file in pc_files:
 npy_visualization(combined_rand_pointcloud, combined_rand_keypoint)
 
 transformation_matrices = {}
-# 遍历生成树的每条边，执行点云配准
-for edge in dfs_tree.edges():
-    node1, node2 = edge
 
-    # 读取两个点云
-    kp1 = kprp_dict[node1]
-    kp2 = kprp_dict[node2]
+max_attempts = 20  # 设置最大尝试次数，防止无限循环
 
-    d_pairs, d_dist = get_descriptor_pairs.get_descriptor_pairs_classical(kp1, kp2)
-    # 使用点云配准计算变换矩阵
-    R, T = registration_use_ransac.assy_use_ransac(kp1, kp2, d_pairs, d_dist)
+previous_start_nodes = set()
 
-    # 保存变换矩阵
-    transformation_matrices[edge] = transformation
+for attempt in range(max_attempts):
+    start_node = np.random.choice(graph.nodes())
+    while start_node in previous_start_nodes and len(previous_start_nodes) < len(graph.nodes()):
+        start_node = np.random.choice(graph.nodes())
 
-# 你现在有一个变换矩阵的字典，可以使用这些矩阵来结合所有的点云
+    previous_start_nodes.add(start_node)
 
-# 初始化combined_point_cloud为DFS树的第一个点云
-combined_point_cloud = pc_dict[next(iter(dfs_tree.nodes()))]  # 从第一个点开始
+    dfs_tree = nx.dfs_tree(graph, source=start_node)
 
-# 遍历DFS的每一条边
-for edge in nx.dfs_edges(dfs_tree):
-    node1, node2 = edge
-    point_cloud_to_add = pc_dict[node2]
+    # 初始化combined_point_cloud为DFS树的第一个点云
+    combined_pointcloud = pcrp_dict[next(iter(dfs_tree.nodes()))]
+    combined_keypoint = kprp_dict[next(iter(dfs_tree.nodes()))]
 
-    # 获取和应用对应的变换矩阵
-    if edge in transformation_matrices:
-        matrix = transformation_matrices[edge]
-        point_cloud_to_add.transform(matrix)
+    nan_detected = False  # 设置一个标志来检测是否出现了nan
 
-    combined_point_cloud += point_cloud_to_add
+    # 遍历生成树的每条边，执行点云配准
+    for edge in dfs_tree.edges():
+        node1, node2 = edge
 
-# 现在，combined_point_cloud是结合了所有点云的结果
+        # 读取两个点云
+        kp1 = kprp_dict[node1]
+        kp2 = kprp_dict[node2]
 
-o3d.visualization.draw_geometries([combined_point_cloud])
+        d_pairs, d_dist = get_descriptor_pairs.get_descriptor_pairs_classical(kp2, kp1)
+        # 使用点云配准计算变换矩阵
+        R, T = registration_use_ransac.assy_use_ransac(kp2, kp1, d_pairs, d_dist)
+
+        # 检测R和T中是否有nan
+        if np.isnan(R).any() or np.isnan(T).any():
+            nan_detected = True
+            print("计算R、T失败，重新构建生成树中…………")
+            break  # 跳出内部循环
+
+        # 更新node2的关键点
+        for i in range(len(kp2)):
+            coord = np.array(kp2[i][:3]).reshape(3, 1)  # 取出前三维的坐标
+            new_coord = np.dot(R, coord) + T.reshape(3, 1)
+            kp2[i][:3] = new_coord.ravel()
+
+        kprp_dict[node2] = kp2  # 更新字典
+
+        # 根据描述，您还需要更新pcrp_dict。相似的方式可以用于pcrp_dict
+        pc1 = pcrp_dict[node1]
+        pc2 = pcrp_dict[node2]
+        for i in range(len(pc2)):
+            coord = np.array(pc2[i][:3]).reshape(3, 1)  # 取出前三维的坐标
+            new_coord = np.dot(R, coord) + T.reshape(3, 1)
+            pc2[i][:3] = new_coord.ravel()
+
+        pcrp_dict[node2] = pc2  # 更新字典
+
+        combined_keypoint = np.vstack((combined_keypoint, kprp_dict[node2]))
+        combined_pointcloud = np.vstack((combined_pointcloud, pcrp_dict[node2]))
+
+    if not nan_detected:  # 如果没有检测到nan，则跳出主循环
+        break
+
+    # 创建一个图形实例
+    plt.figure(figsize=(12, 8))
+
+    # 使用networkx的draw函数绘制生成树
+    pos = nx.spring_layout(dfs_tree)  # 使用spring_layout布局，你也可以更改为其他布局
+    nx.draw(dfs_tree, pos, with_labels=True, node_color="skyblue", node_size=1500, width=4, edge_color="gray",
+            font_size=15)
+
+    # 添加标题和显示图形
+    plt.title("DFS Tree Visualization")
+    plt.show()
+
+npy_visualization(combined_pointcloud, combined_keypoint)
+
+

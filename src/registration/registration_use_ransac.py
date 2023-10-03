@@ -8,21 +8,21 @@ from src.registration.estimateGeometricTransform3D import estimate_rigid_transfo
 print_flag = True
 def assy_use_ransac(kp1, kp2, d_pairs, d_dist):
     nb_non_matches = 0
-    A_rp_pair = np.array([kp1[:, :1][d_pairs[:, 0]],
+    A_rp_pair = np.hstack([kp1[:, :1][d_pairs[:, 0]],
                           kp1[:, 1:2][d_pairs[:, 0]],
-                          kp1[:, 2:3][d_pairs[:, 0]]]).T
+                          kp1[:, 2:3][d_pairs[:, 0]]])
 
     # A_gt_pair = np.array([kp[comb_pairwise[i][0]]['gt']['x'][d_pairs[:, 0]],
     #                       kp[comb_pairwise[i][0]]['gt']['y'][d_pairs[:, 0]],
     #                       kp[comb_pairwise[i][0]]['gt']['z'][d_pairs[:, 0]]]).T
 
-    B_rp_pair = np.array([kp2[:, :1][d_pairs[:, 1]],
+    B_rp_pair = np.hstack([kp2[:, :1][d_pairs[:, 1]],
                           kp2[:, 1:2][d_pairs[:, 1]],
-                          kp2[:, 2:3][d_pairs[:, 1]]]).T
+                          kp2[:, 2:3][d_pairs[:, 1]]])
 
     # B_gt_pair = np.array([kp[comb_pairwise[i][1]]['gt']['x'][d_pairs[:, 1]],
     #                       kp[comb_pairwise[i][1]]['gt']['y'][d_pairs[:, 1]],
-    #                       kp[comb_pairwise[i][1]]['gt']['z'][d_pairs[:, 1]]]).T
+    #                       kp[comb_pairwise[i][1]]['gt']['z'][d_pa irs[:, 1]]]).T
     if print_flag:
         print('Number of keypoint pairs: ', len(A_rp_pair))
     # Prepare input data for solver
@@ -35,7 +35,7 @@ def assy_use_ransac(kp1, kp2, d_pairs, d_dist):
 
     # Transformation (R, T) to map pts1 to pts2 (pts1_transformed = R_ransac*ptsA+T_ransac)
     if len(A_rp_pair) > 1:
-        tformEst, inlierIndex = estimate_rigid_transform(ptsA, ptsB, max_distance=0.05)
+        tformEst, inlierIndex = estimate_rigid_transform(ptsA, ptsB, max_distance=0.3)
         R_ransac = tformEst["Rotation"].T
         T_ransac = tformEst["Translation"].T
         # tformEst, inlierIndex = estimateGeometricTransform3D(ptsA.T, ptsB.T, transform_type='rigid',maxDistance=0.05)
@@ -50,7 +50,7 @@ def assy_use_ransac(kp1, kp2, d_pairs, d_dist):
             print(y)
 
         matching_pairwise = {}
-        if np.sum(inlierIndex) >= 5:
+        if np.sum(inlierIndex) >= 10:
             if print_flag:
                 print('Valid solution for T_ransac')
 
@@ -84,4 +84,4 @@ def assy_use_ransac(kp1, kp2, d_pairs, d_dist):
         matching_pairwise['transformation_A'] = np.vstack(
             (np.hstack((R_ransac, T_ransac.reshape(-1, 1))), np.array([0, 0, 0, 1])))
         nb_non_matches += 1
-        return R_ransac, T_ransac
+    return R_ransac, T_ransac
