@@ -50,7 +50,7 @@ class Extractor(object):
         self.keypoint_radius = keypoint_radius
         self.n_keypoints = n_keypoints
         self.cov_mats = []
-        self.point_cloud = None
+        self.vertices = None
         self.keypoints = None
         self.k = neighbours
         self.lbd = lbd_value
@@ -68,13 +68,13 @@ class Extractor(object):
         return SD
 
     # Assembling the above
-    def get_SD_for_point_cloud(self, point_cloud, normals, neighbourhood):
-        n_points = len(point_cloud)
+    def get_SD_for_vertices(self, vertices, normals, neighbourhood):
+        n_points = len(vertices)
         # Compute SD
         SD = np.zeros((n_points))
         for i in range(n_points):
             SD[i] = self.compute_SD_point(
-                np.asarray(neighbourhood[i]), point_cloud, normals, i
+                np.asarray(neighbourhood[i]), vertices, normals, i
             )
         return SD
 
@@ -113,7 +113,7 @@ class Extractor(object):
         return H
 
     def calculate_deltas(self, p_i_neighbourhood):
-        C_p_i = np.cov(self.point_cloud[p_i_neighbourhood].T) * len(p_i_neighbourhood)
+        C_p_i = np.cov(self.vertices[p_i_neighbourhood].T) * len(p_i_neighbourhood)
         U, S, Vt = np.linalg.svd(C_p_i)
         lambda1, lambda2, lambda3 = S
         delta1 = (lambda1 - lambda2) / lambda1
@@ -123,27 +123,27 @@ class Extractor(object):
 
     def extract(self):
         fragment = np.load(self.fragment_path)
-        point_cloud = fragment[:, :3]
-        # self.point_cloud = point_cloud
+        vertices = fragment[:, :3]
+        # self.vertices = vertices
         normals = fragment[:, 3:6]
         colors = fragment[:, 6:9]
         if self.useflags:
             # 创建一个布尔掩码，检查colors中的每一行是否不与[255, 255, 255]相匹配
             mask = ~np.all(colors == [1, 1, 1], axis=1)
-            # 使用掩码筛选point_cloud和normals
-            point_cloud = point_cloud[mask]
+            # 使用掩码筛选vertices和normals
+            vertices = vertices[mask]
             normals = normals[mask]
             colors = colors[mask]
-            self.point_cloud = point_cloud
+            self.vertices = vertices
         else:
-            self.point_cloud = point_cloud
+            self.vertices = vertices
         # Get all radius r neighbourhoods for each r
         keypoint_radius = self.keypoint_radius
-        tree = spatial.KDTree(point_cloud)
+        tree = spatial.KDTree(vertices)
 
         # Extract keypoints
-        nbhd = tree.query_ball_point(point_cloud, keypoint_radius, workers=-1)
-        SD = self.get_SD_for_point_cloud(point_cloud, normals, nbhd)
+        nbhd = tree.query_ball_point(vertices, keypoint_radius, workers=-1)
+        SD = self.get_SD_for_vertices(vertices, normals, nbhd)
         print(f"zeros: {np.sum(np.isclose(SD, 0))}, out of {len(SD)}")
         # if SD == 0 we would set the normal to 0, which is bad
         SD[SD == 0] = 1e-10
@@ -151,18 +151,18 @@ class Extractor(object):
         normals = normals * np.sign(SD[:, None])
 
         # Edge filtering
-        dists_edges, nbhd_edges = tree.query(x=point_cloud, k=self.k, workers=-1)
+        dists_edges, nbhd_edges = tree.query(x=vertices, k=self.k, workers=-1)
         is_edge = []
-        for i in range(point_cloud.shape[0]):
+        for i in range(vertices.shape[0]):
             # get neighboring points
             closest_points = nbhd_edges[i]
-            if np.max(closest_points) < point_cloud.shape[0]:
-                C_i = np.mean(point_cloud[closest_points], axis=0)
+            if np.max(closest_points) < vertices.shape[0]:
+                C_i = np.mean(vertices[closest_points], axis=0)
             else:
                 print(f"Invalid indices found: {closest_points}")
             Z_i = dists_edges[i][1]
 
-            score = np.linalg.norm(C_i - point_cloud[i])
+            score = np.linalg.norm(C_i - vertices[i])
             is_edge.append(score > self.lbd * Z_i)
         is_edge = np.asarray(is_edge)
         print(f"Points on edge out of total: {np.sum(is_edge)} / {len(is_edge)}")
@@ -176,7 +176,7 @@ class Extractor(object):
             keypoint_indices_nms = []
             rem_list = []
             nms_rad = self.nms_rad
-            nbhd_nms = tree.query_ball_point(point_cloud, nms_rad, workers=-1)
+            nbhd_nms = tree.query_ball_point(vertices, nms_rad, workers=-1)
 
             for i in keypoint_indices:
                 if (len(keypoint_indices_nms) > self.n_keypoints):
@@ -189,27 +189,28 @@ class Extractor(object):
         else:
             keypoint_indices = np.argsort(np.abs(SD))[-self.n_keypoints:]
 
-        self.keypoints = self.point_cloud[keypoint_indices]
+        self.keypoints = self.vertices[keypoint_indices]
+        
         # Compute the neighbourhoods in all r vals
         neighbourhoods = {}
-        H_lut = np.zeros((len(self.r_vals), point_cloud.shape[0]))
-        deltas_lut = np.zeros((len(self.r_vals), point_cloud.shape[0], 3))
+        H_lut = np.zeros((len(self.r_vals), vertices.shape[0]))
+        deltas_lut = np.zeros((len(self.r_vals), vertices.shape[0], 3))
         print("Building neighbourhoods, H and deltas")
         for r in self.r_vals:
-            neighbourhoods[r] = tree.query_ball_point(point_cloud, r, workers=-1)
+            neighbourhoods[r] = tree.query_ball_point(vertices, r, workers=-1)
 
             if self.num_features <= 3:
                 continue
             # save H and deltas for ALL points
-            for p_i in tqdm(range(point_cloud.shape[0])):
+            for p_i in tqdm(range(vertices.shape[0])):
                 deltas_lut[self.r_vals.index(r), p_i, :] = self.calculate_deltas(
                     neighbourhoods[r][p_i]
                 )
                 if self.num_features <= 6:
                     continue
                 H_lut[self.r_vals.index(r), p_i] = self.calculate_H(
-                    point_cloud[neighbourhoods[r][p_i]],
-                    point_cloud[p_i],
+                    vertices[neighbourhoods[r][p_i]],
+                    vertices[p_i],
                     normals[p_i],
                 )
         if self.plot_features:
@@ -228,7 +229,7 @@ class Extractor(object):
         # For each keypoint
         for n_keypoint, keypoint_index in enumerate(tqdm(keypoint_indices)):
             # Get keypoint, normal of the keypoint and color of the keypoint
-            keypoint = point_cloud[keypoint_index]
+            keypoint = vertices[keypoint_index]
             keypoint_normal = normals[keypoint_index]
             keypoint_color = colors[keypoint_index]  # 获取关键点的颜色
 
@@ -255,7 +256,7 @@ class Extractor(object):
                     p_i_neighbourhood = neighbourhoods[r][p_i]
 
                     # Compute cosines
-                    p_i_point = point_cloud[p_i]
+                    p_i_point = vertices[p_i]
                     p_i_normal = normals[p_i]
                     p_p_i_vector = p_i_point - keypoint
                     cos_alpha = np.dot(p_p_i_vector, p_i_normal) / np.linalg.norm(
@@ -323,9 +324,9 @@ class Extractor(object):
         )
         fig.add_trace(
             go.Scatter3d(
-                x=self.point_cloud[:, 0],
-                y=self.point_cloud[:, 1],
-                z=self.point_cloud[:, 2],
+                x=self.vertices[:, 0],
+                y=self.vertices[:, 1],
+                z=self.vertices[:, 2],
                 mode="markers",
                 marker=dict(
                     size=2,
@@ -339,9 +340,9 @@ class Extractor(object):
         )
         fig.add_trace(
             go.Scatter3d(
-                x=self.point_cloud[:, 0],
-                y=self.point_cloud[:, 1],
-                z=self.point_cloud[:, 2],
+                x=self.vertices[:, 0],
+                y=self.vertices[:, 1],
+                z=self.vertices[:, 2],
                 mode="markers",
                 marker=dict(
                     size=2,
@@ -355,9 +356,9 @@ class Extractor(object):
         )
         fig.add_trace(
             go.Scatter3d(
-                x=self.point_cloud[:, 0],
-                y=self.point_cloud[:, 1],
-                z=self.point_cloud[:, 2],
+                x=self.vertices[:, 0],
+                y=self.vertices[:, 1],
+                z=self.vertices[:, 2],
                 mode="markers",
                 marker=dict(
                     size=2,
@@ -371,9 +372,9 @@ class Extractor(object):
         )
         fig.add_trace(
             go.Scatter3d(
-                x=self.point_cloud[:, 0],
-                y=self.point_cloud[:, 1],
-                z=self.point_cloud[:, 2],
+                x=self.vertices[:, 0],
+                y=self.vertices[:, 1],
+                z=self.vertices[:, 2],
                 mode="markers",
                 marker=dict(
                     size=2,
@@ -441,9 +442,9 @@ def visualize_matches(extractor1, extractor2, n_points, n_scales, threshold, num
     fig = go.Figure()
     fig.add_trace(
         go.Scatter3d(
-            x=extractor1.point_cloud[:, 0],
-            y=extractor1.point_cloud[:, 1],
-            z=extractor1.point_cloud[:, 2],
+            x=extractor1.vertices[:, 0],
+            y=extractor1.vertices[:, 1],
+            z=extractor1.vertices[:, 2],
             mode="markers",
             marker=dict(
                 size=1,
@@ -461,16 +462,16 @@ def visualize_matches(extractor1, extractor2, n_points, n_scales, threshold, num
     )
 
     extractor2.keypoints[:, 0] += c[0]
-    extractor2.point_cloud[:, 0] += c[0]
+    extractor2.vertices[:, 0] += c[0]
     extractor2.keypoints[:, 1] += c[1]
-    extractor2.point_cloud[:, 1] += c[1]
+    extractor2.vertices[:, 1] += c[1]
     extractor2.keypoints[:, 2] += c[2]
-    extractor2.point_cloud[:, 2] += c[2]
+    extractor2.vertices[:, 2] += c[2]
     fig.add_trace(
         go.Scatter3d(
-            x=extractor2.point_cloud[:, 0],
-            y=extractor2.point_cloud[:, 1],
-            z=extractor2.point_cloud[:, 2],
+            x=extractor2.vertices[:, 0],
+            y=extractor2.vertices[:, 1],
+            z=extractor2.vertices[:, 2],
             mode="markers",
             marker=dict(
                 size=1,
@@ -513,7 +514,7 @@ def extract_key_point_by_dir(dataset_dir, n_keypoints, keypoint_radius, r_vals, 
     for fragment in fragments:
         print(f"Fragment: {fragment}")
         fragment_path = os.path.join(dataset_dir, fragment)
-        keypoints_dir = os.path.join(dataset_dir, "keypoints")
+        keypoints_dir = os.path.join(dataset_dir, "keypoints_SD")
         if not os.path.exists(keypoints_dir):
             os.mkdir(keypoints_dir)
 
