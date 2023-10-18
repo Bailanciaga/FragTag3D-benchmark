@@ -11,7 +11,7 @@ from src.keypoints.tools.transformation import centering_centroid
 from src.descriptors.extract_descriptors_cov import get_cov_descriptor
 
 
-def get_harris_keypoints(fragment, npoints, outputpath):
+def get_harris_keypoints(fragment, npoints):
     vertices = fragment[:, :3]
     points = deepcopy(vertices)
     # parameters
@@ -70,4 +70,4 @@ def get_harris_keypoints(fragment, npoints, outputpath):
 
     keypoints = fragment[keypoint_indexes]
 
-    get_cov_descriptor(fragment, keypoints, keypoint_indexes, outputpath)
+    return get_cov_descriptor(fragment, keypoints, keypoint_indexes)

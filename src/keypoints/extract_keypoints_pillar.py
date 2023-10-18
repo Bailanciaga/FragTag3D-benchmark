@@ -21,7 +21,7 @@ def compute_smoothness(vertices, n_neighbors):
     return c
 
 
-def get_pillar_keypoints(fragment, n_neighbors, n_keypoints, outputpath, sharp_percentage=0.5):
+def get_pillar_keypoints(fragment, n_neighbors, n_keypoints, sharp_percentage=0.5):
     vertices = fragment[:, :3]
     c = np.array(compute_smoothness(vertices, n_neighbors))
     # normalize it and argsort to get lowest and highest values
@@ -49,4 +49,4 @@ def get_pillar_keypoints(fragment, n_neighbors, n_keypoints, outputpath, sharp_p
     keypoints = fragment[indices_to_keep]
     keypoints_idxs = indices_to_keep
 
-    get_cov_descriptor(fragment, keypoints, keypoints_idxs, outputpath)
+    return get_cov_descriptor(fragment, keypoints, keypoints_idxs)

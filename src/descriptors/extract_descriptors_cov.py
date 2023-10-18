@@ -8,10 +8,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 useflags = True
-keypoint_radius = 0.04
-r_vals = [0.04, 0.05, 0.06, 0.08, 0.10]
+keypoint_radius = 0.08
+r_vals = [0.08, 0.09, 0.1, 0.12, 0.14]
 num_features = 3
-plot_features = True
+plot_features = False
 cov_mats = []
 output_path = ''
 
@@ -148,22 +148,11 @@ def feature_plot(vertices, H_lut, deltas_lut):
 
 
 # Compute the neighbourhoods in all r vals
-def get_cov_descriptor(fragment, keypoint, keypoint_indices, output_path):
+def get_cov_descriptor(fragment, keypoint, keypoint_indices):
     vertices = fragment[:, :3]
     # self.vertices = vertices
     normals = fragment[:, 3:6]
     colors = fragment[:, 6:9]
-    # if useflags:
-    #     # 创建一个布尔掩码，检查colors中的每一行是否不与[255, 255, 255]相匹配
-    #     mask = ~np.all(colors == [1, 1, 1], axis=1)
-    #     # 使用掩码筛选vertices和normals
-    #     vertices = vertices[mask]
-    #     normals = normals[mask]
-    #     colors = colors[mask]
-    #     self.vertices = vertices
-    # else:
-    #     vertices = vertices
-    # Get all radius r neighbourhoods for each r
     tree = spatial.KDTree(vertices)
     neighbourhoods = {}
     H_lut = np.zeros((len(r_vals), vertices.shape[0]))
@@ -178,7 +167,7 @@ def get_cov_descriptor(fragment, keypoint, keypoint_indices, output_path):
         # save H and deltas for ALL points
         for p_i in tqdm(range(vertices.shape[0])):
             deltas_lut[r_vals.index(r), p_i, :] = calculate_deltas(
-                vertices ,neighbourhoods[r][p_i]
+                vertices, neighbourhoods[r][p_i]
             )
             if num_features <= 6:
                 continue
@@ -262,6 +251,11 @@ def get_cov_descriptor(fragment, keypoint, keypoint_indices, output_path):
             # if len(Phi) == 0:
             # 	pdb.set_trace()
             # 	ValueError('Phi为空！！')
+            # 寻找包含nan的列
+            cols_with_nan = np.any(np.isnan(Phi), axis=0)
+
+            # 删除这些列
+            Phi = Phi[:, ~cols_with_nan]
             C_r = np.cov(Phi)
 
             # Compute log and save
@@ -276,4 +270,4 @@ def get_cov_descriptor(fragment, keypoint, keypoint_indices, output_path):
                                                          + (r_idx + 1) * n_features_used * n_features_used,
             ] = log_C_r.ravel()
         cov_mats.append(keypoint_cov_mats)
-    np.save(output_path, output_matrix)
+    return output_matrix

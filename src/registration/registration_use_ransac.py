@@ -6,6 +6,8 @@ import numpy as np
 from src.registration.estimateGeometricTransform3D import estimate_rigid_transform
 
 print_flag = True
+
+
 def assy_use_ransac(kp1, kp2, d_pairs, d_dist):
     nb_non_matches = 0
     A_rp_pair = np.hstack([kp1[:, :1][d_pairs[:, 0]],
@@ -50,7 +52,7 @@ def assy_use_ransac(kp1, kp2, d_pairs, d_dist):
             print(y)
 
         matching_pairwise = {}
-        if np.sum(inlierIndex) >= 15:
+        if x - y >= 5:
             if print_flag:
                 print('Valid solution for T_ransac')
 

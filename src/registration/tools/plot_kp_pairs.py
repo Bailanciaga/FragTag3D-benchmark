@@ -2,6 +2,7 @@
 # Date: 2023/10/7
 # Description: plot_kp_pairs
 import plotly.graph_objects as go
+import open3d as o3d
 from plotly.subplots import make_subplots
 import numpy as np
 
@@ -20,7 +21,17 @@ def create_3d_line(coord1, coord2):
     return line
 
 
+def pc_down_sample(pc, voxel_size):
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(pc[:, :3])
+    down_pcd = pcd.voxel_down_sample(voxel_size)
+    down_pcd = np.asarray(down_pcd.points)
+    return down_pcd
+
+
 def kp_plot(kp1, kp2, pc1, pc2, d_pairs):
+    down_pcd1 = pc_down_sample(pc1, 0.05)
+    down_pcd2 = pc_down_sample(pc2, 0.05)
     layout = go.Layout(
         scene=dict(
             xaxis=dict(
@@ -45,16 +56,16 @@ def kp_plot(kp1, kp2, pc1, pc2, d_pairs):
     )
     fig = go.Figure(layout=layout)
     fig.add_trace(go.Scatter3d(
-        x=pc1[:, 0],
-        y=pc1[:, 1],
-        z=pc1[:, 2],
+        x=down_pcd1[:, 0],
+        y=down_pcd1[:, 1],
+        z=down_pcd1[:, 2],
         mode='markers',
         marker=dict(size=2, color='blue')
     ))
     fig.add_trace(go.Scatter3d(
-        x=pc2[:, 0],
-        y=pc2[:, 1],
-        z=pc2[:, 2],
+        x=down_pcd2[:, 0],
+        y=down_pcd2[:, 1],
+        z=down_pcd2[:, 2],
         mode='markers',
         marker=dict(size=2, color='red')
     ))

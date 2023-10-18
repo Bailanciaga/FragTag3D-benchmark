@@ -4,7 +4,9 @@
 import open3d as o3d
 import numpy as np
 from src.descriptors.extract_descriptors_cov import get_cov_descriptor
-def get_iss_keypoints(fragment, outputpath):
+
+
+def get_iss_keypoints(fragment):
     vertices = fragment[:, :3]
     pcd = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(vertices))
 
@@ -19,4 +21,4 @@ def get_iss_keypoints(fragment, outputpath):
 
     keypoints = fragment[keypoint_indexes]
 
-    get_cov_descriptor(fragment, keypoints, keypoint_indexes, outputpath)
+    return get_cov_descriptor(fragment, keypoints, keypoint_indexes)

@@ -1,5 +1,4 @@
 import shutil
-
 import numpy as np
 import open3d as o3d
 import os
@@ -29,7 +28,7 @@ Fragments with <1000 points after downsampling won't get downsampled
 # #output_folder = f"{root}/npy"  # will be generated for output
 # input_folder = f"/home/suhaot/PycharmProjects/3d-fracture-reassembly/dataset/TUWien"
 # output_folder = f"/home/suhaot/PycharmProjects/3d-fracture-reassembly/dataset_kp/TUWien_seg"
-sample_size = 0.01
+every_k_points = 2
 
 
 # def convert_pointclouds(input_folder, output_folder):
@@ -42,13 +41,13 @@ sample_size = 0.01
 #     print(f"Folders: {folders}")
 #     for dir in folders:
 #         collect_pointclouds(dir, input_folder, output_folder)
+plot_npy = False
 
 
 def collect_pointclouds(inputpath):
     """
     convert and save all pointcloud data from a single folder
     """
-
 
     pc_dict = {}
     b_max = np.zeros((3,))
@@ -92,15 +91,14 @@ def _downsample_and_save(inputpath, pc_dict, scale=2):
     if not os.path.exists(outputpath):
         os.makedirs(outputpath)
         print(f"'{outputpath}' 已被创建。")
-    else:
-        print(f"'{outputpath}' 已存在,正在重新创建。")
-        shutil.rmtree(outputpath)
-        os.makedirs(outputpath)
+    # else:
+    #     print(f"'{outputpath}' 已存在,正在重新创建。")
+    #     shutil.rmtree(outputpath)
+    #     os.makedirs(outputpath)
 
-    fig = go.Figure()
     for file, pcloud in pc_dict.items():
         pcloud.scale(2 / scale, [0, 0, 0])
-        pc_d = pcloud.voxel_down_sample(voxel_size=sample_size)
+        pc_d = pcloud.uniform_down_sample(every_k_points)
 
         points = np.asarray(pc_d.points)
         normals = np.asarray(pc_d.normals)
@@ -108,42 +106,45 @@ def _downsample_and_save(inputpath, pc_dict, scale=2):
         if points.shape[0] < 1000:
             points = np.asarray(pcloud.points)
             normals = np.asarray(pcloud.normals)
-            colors = np.asarray(pcloud.colors)
+            colors = np.asarray(pcloud.colors) * 255
             print(f"{file} resampled to < 1000 points, using original: #{points.shape[0]}")
         print(f'{file} resampled to {points.shape[0]}')
         data = np.concatenate([points, normals, colors], axis=1)
-        fig.add_trace(
-            go.Scatter3d(
-                x=data[:, 0],
-                y=data[:, 1],
-                z=data[:, 2],
-                name=f"{file}.npy",
-                mode="markers",
-                marker=dict(size=2),
-            )
-        )
-
         out_file = os.path.join(outputpath, file)
         np.save(out_file, data)
 
-    fig.update_layout(
-        scene=dict(
-            xaxis=dict(
-                nticks=5,
-                range=[-1.5, 1.5],
-            ),
-            yaxis=dict(
-                nticks=5,
-                range=[-1.5, 1.5],
-            ),
-            zaxis=dict(
-                nticks=5,
-                range=[-1.5, 1.5],
-            ),
-            aspectmode='cube'
-        )
-    )
-    fig.write_html(os.path.join(outputpath, "scatter_plot.html"))
+        if plot_npy:
+            fig = go.Figure()
+            fig.add_trace(
+                go.Scatter3d(
+                    x=data[:, 0],
+                    y=data[:, 1],
+                    z=data[:, 2],
+                    name=f"{file}.npy",
+                    mode="markers",
+                    marker=dict(size=2),
+                )
+            )
+
+            fig.update_layout(
+                scene=dict(
+                    xaxis=dict(
+                        nticks=5,
+                        range=[-1.5, 1.5],
+                    ),
+                    yaxis=dict(
+                        nticks=5,
+                        range=[-1.5, 1.5],
+                    ),
+                    zaxis=dict(
+                        nticks=5,
+                        range=[-1.5, 1.5],
+                    ),
+                    aspectmode='cube'
+                )
+            )
+            fig.write_html(os.path.join(outputpath, "scatter_plot.html"))
+
     return outputpath
 
 # if __name__ == "__main__":

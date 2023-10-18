@@ -5,7 +5,7 @@ import frag_relation_graph as frg
 import os
 import matplotlib.pyplot as plt
 from src.dataprocess import open3d_resample
-from src.keypoints import extract_keypoints_SD
+from src.keypoints import extract_keypoints_SDplus
 from src.registration import get_descriptor_pairs
 from src.dataprocess import generate_rand_pose
 from src.registration import registration_use_ransac
@@ -13,7 +13,7 @@ from src.keypoints import extract_keypoint_dir
 from src.registration.tools import plot_kp_pairs
 # inputpath = '../../data/TUWien/brick/'
 # inputpath = '../../data/thingi10k/41272_5_seed_1/'
-inputpath = '../../data/thingi10k/37627/37627_5_seed_0/'
+inputpath = '../../data/thingi10k/37620/37620_5_seed_1/'
 
 
 def dowmSample_and_extract(inputpath, method, params=None):
@@ -22,9 +22,9 @@ def dowmSample_and_extract(inputpath, method, params=None):
 
     if params == None:
         n_keypoints = 512
-        keypoint_radius = 0.06
-        r_vals = [0.06, 0.07, 0.08, 0.10, 0.12]
-        nms_rad = 0.06
+        keypoint_radius = 0.015
+        r_vals = [0.015, 0.02, 0.03, 0.04, 0.05]
+        nms_rad = 0.02
     else:
         n_keypoints = params["n_keypoints"]
         keypoint_radius = params["keypoint_radius"]
@@ -32,17 +32,18 @@ def dowmSample_and_extract(inputpath, method, params=None):
         nms_rad = params["nms_rad"]
     print("Extracting Key Points...")
     # TODO change the file address to windows format
-    if method == 'SD':
-        extract_keypoints_SD.extract_key_point_by_dir(output_path, n_keypoints, keypoint_radius, r_vals, nms_rad, useflags=True)
+    if method == 'SD+':
+        extract_keypointSD.extract_key_point_by_dir(output_path, n_keypoints, keypoint_radius, r_vals, nms_rad, useflags=True)
     else:
         extract_keypoint_dir.extract_key_point_by_dir(output_path, method, useflags=True)
 
     return output_path
 
-def extract_by_color(point_cloud, target_color):
-    colors = np.asarray(point_cloud.colors)
+
+def extract_by_color(pc, target_color):
+    colors = pc[:, 6:9]
     mask = np.all(np.isclose(colors * 255, target_color, atol=1e-5), axis=1)
-    return point_cloud.select_by_index(np.where(mask)[0])
+    return pc[mask]
 
 
 def extract_keypoints(pc1, pc2, pc_dict, graph):
@@ -59,6 +60,7 @@ def extract_keypoints(pc1, pc2, pc_dict, graph):
     keypoints_pc2 = extract_by_color(pc2, edge_color)
 
     return keypoints_pc1, keypoints_pc2
+
 
 def npy_visualization(pc_data, kp_data):
     pc = o3d.geometry.PointCloud()
@@ -84,19 +86,6 @@ def npy_visualization(pc_data, kp_data):
     vis.run()
     vis.destroy_window()
 
-def transform_point_cloud(pc, R, T):
-    # 构建变换矩阵
-    transform = np.eye(4)
-    transform[0:3, 0:3] = R
-    transform[0:3, 3] = T
-
-    # 将点云转化为齐次坐标
-    homogenous_pc = np.ones((pc.shape[0], 4))
-    homogenous_pc[:, 0:3] = pc
-
-    # 应用变换
-    transformed_pc = homogenous_pc.dot(transform.T)
-    return transformed_pc[:, 0:3]
 
 # 加载之前保存的数据
 graph, ply_files_dict, edge_color_map = frg.create_graph(inputpath)
@@ -116,22 +105,22 @@ plt.title("DFS Tree Visualization")
 plt.show()
 
 # 选择关键点提取算法：SD、harris、iss、pillar
-method = 'SD'
+method = 'SD+'
 #下采样、转换格式并提取关键点
-outputpath = dowmSample_and_extract(inputpath, method)
+# outputpath = dowmSample_and_extract(inputpath, method)
 
-pc_files = [f for f in os.listdir(outputpath) if f.endswith('.npy')]
-kp_files = [f for f in os.listdir(os.path.join(outputpath, 'keypoints_' + method)) if f.endswith('.npy')]
+pc_files = [f for f in os.listdir("/home/suhaot/PycharmProjects/FragTag3D/data/thingi10k/37620/37620_5_seed_1/npy") if f.endswith('.npy')]
+kp_files = [f for f in os.listdir(os.path.join("/home/suhaot/PycharmProjects/FragTag3D/data/thingi10k/37620/37620_5_seed_1/npy", 'keypoints_' + method)) if f.endswith('.npy')]
 
 # 初始化一个字典来存储节点名字和随机旋转后的ply对象
 pcrp_dict = {}
 kprp_dict = {}
 
-combined_rand_pointcloud = np.empty((0,9))
-combined_rand_keypoint = np.empty((0,9))
+combined_rand_pointcloud = np.empty((0, 9))
+combined_rand_keypoint = np.empty((0, 9))
 for file in pc_files:
-    pc_path = os.path.join(outputpath, file)
-    kp_path = os.path.join(outputpath, 'keypoints_' + method, file)
+    pc_path = os.path.join("/home/suhaot/PycharmProjects/FragTag3D/data/thingi10k/37620/37620_5_seed_1/npy", file)
+    kp_path = os.path.join("/home/suhaot/PycharmProjects/FragTag3D/data/thingi10k/37620/37620_5_seed_1/npy", 'keypoints_' + method, file)
     pcrp, kprp, transform_matrix = generate_rand_pose.apply_transform(pc_path, kp_path)
     pcrp_dict[os.path.basename(file).split('.')[0]] = pcrp
     kprp_dict[os.path.basename(file).split('.')[0]] = kprp
@@ -145,12 +134,19 @@ transformation_matrices = {}
 max_attempts = 20   # 设置最大尝试次数，防止无限循环
 
 previous_start_nodes = set()
+# 记录下次开始的节点，初始为空
+next_start_node = None
 
 for attempt in range(max_attempts):
-    start_node = np.random.choice(graph.nodes())
-    while start_node in previous_start_nodes and len(previous_start_nodes) < len(graph.nodes()):
-        start_node = np.random.choice(graph.nodes())
 
+    # 使用上一次循环中的node2作为起点，或从图中随机选择一个开始节点
+    if next_start_node:
+        start_node = next_start_node
+        next_start_node = None
+    else:
+        start_node = np.random.choice(graph.nodes())
+        while start_node in previous_start_nodes and len(previous_start_nodes) < len(graph.nodes()):
+            start_node = np.random.choice(graph.nodes())
     previous_start_nodes.add(start_node)
 
     dfs_tree = nx.dfs_tree(graph, source=start_node)
@@ -161,52 +157,62 @@ for attempt in range(max_attempts):
 
     nan_detected = False  # 设置一个标志来检测是否出现了nan
 
+    print("***************************Registration***************************")
     # 遍历生成树的每条边，执行点云配准
     for edge in dfs_tree.edges():
         node1, node2 = edge
+        sorted_edge = tuple(sorted(edge))
 
+        color = edge_color_map[sorted_edge]
         # 读取两个点云
         kp1 = kprp_dict[node1]
         kp2 = kprp_dict[node2]
 
+        kp1_colored = extract_by_color(kp1, color)
+        kp2_colored = extract_by_color(kp2, color)
+
         pc1 = pcrp_dict[node1]
         pc2 = pcrp_dict[node2]
 
-        d_pairs, d_dist = get_descriptor_pairs.get_descriptor_pairs_classical(kp2, kp1)
-        # 使用点云配准计算变换矩阵
-        R, T = registration_use_ransac.assy_use_ransac(kp2, kp1, d_pairs, d_dist)
+        print("-------Fragment : " + node1 + " & " + node2 + " (" + ', '.join(map(str, color)) + ")")
 
+        d_pairs, d_dist = get_descriptor_pairs.get_descriptor_pairs_classical(kp2_colored, kp1_colored)
+        # 使用点云配准计算变换矩阵
+        R, T = registration_use_ransac.assy_use_ransac(kp2_colored, kp1_colored, d_pairs, d_dist)
 
         # 检测R和T中是否有nan
-        if np.isnan(R).any() or np.isnan(T).any():
-            nan_detected = True
-            print("计算R、T失败，重新构建生成树中…………")
+        if not np.isnan(R).any() and not np.isnan(T).any():
+            # 如果R和T中没有nan，则从图中移除node1及其关联的边
+            graph.remove_node(node1)
+
+            plot_kp_pairs.kp_plot(kp1_colored, kp2_colored, pc1, pc2, d_pairs)
+
+            # 更新node2的关键点
+            for i in range(len(kp2)):
+                coord = np.array(kp2[i][:3]).reshape(3, 1)  # 取出前三维的坐标
+                new_coord = np.dot(R, coord) + T.reshape(3, 1)
+                kp2[i][:3] = new_coord.ravel()
+
+            kprp_dict[node2] = kp2  # 更新字典
+
+            # 更新pcrp_dict。相似的方式可以用于pcrp_dict
+            for i in range(len(pc2)):
+                coord = np.array(pc2[i][:3]).reshape(3, 1)  # 取出前三维的坐标
+                new_coord = np.dot(R, coord) + T.reshape(3, 1)
+                pc2[i][:3] = new_coord.ravel()
+
+            pcrp_dict[node2] = pc2  # 更新字典
+            kp2_colored = extract_by_color(kp2, color)
+            plot_kp_pairs.kp_plot(kp1_colored, kp2_colored, pc1, pc2, d_pairs)
+
+            combined_keypoint = np.vstack((combined_keypoint, kprp_dict[node2]))
+            combined_pointcloud = np.vstack((combined_pointcloud, pcrp_dict[node2]))
+        else:
+            next_start_node = node2
+            print("Calculation of R and T failed, rebuilding the generation tree.......")
             break  # 跳出内部循环
 
-        plot_kp_pairs.kp_plot(kp1, kp2, pc1, pc2, d_pairs)
-
-        # 更新node2的关键点
-        for i in range(len(kp2)):
-            coord = np.array(kp2[i][:3]).reshape(3, 1)  # 取出前三维的坐标
-            new_coord = np.dot(R, coord) + T.reshape(3, 1)
-            kp2[i][:3] = new_coord.ravel()
-
-        kprp_dict[node2] = kp2  # 更新字典
-
-        # 更新pcrp_dict。相似的方式可以用于pcrp_dict
-        for i in range(len(pc2)):
-            coord = np.array(pc2[i][:3]).reshape(3, 1)  # 取出前三维的坐标
-            new_coord = np.dot(R, coord) + T.reshape(3, 1)
-            pc2[i][:3] = new_coord.ravel()
-
-        pcrp_dict[node2] = pc2  # 更新字典
-
-        plot_kp_pairs.kp_plot(kp1, kp2, pc1, pc2, d_pairs)
-
-        combined_keypoint = np.vstack((combined_keypoint, kprp_dict[node2]))
-        combined_pointcloud = np.vstack((combined_pointcloud, pcrp_dict[node2]))
-
-    if not nan_detected:  # 如果没有检测到nan，则跳出主循环
+    if not next_start_node:  # 如果没有检测到nan，则跳出主循环
         break
 
     # 创建一个图形实例
@@ -220,6 +226,9 @@ for attempt in range(max_attempts):
     # 添加标题和显示图形
     plt.title("DFS Tree Visualization")
     plt.show()
+
+    if attempt == 20:
+        print("Registration failed   :(   ")
 
 npy_visualization(combined_pointcloud, combined_keypoint)
 

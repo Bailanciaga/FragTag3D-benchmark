@@ -3,3 +3,5 @@
 # Description: __init__
 from . import dataprocess
 from . import registration
+from . import keypoints
+from . import descriptors

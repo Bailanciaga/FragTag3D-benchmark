@@ -5,6 +5,8 @@ import numpy as np
 import networkx as nx
 import itertools
 from scipy.spatial.distance import cdist
+
+
 def get_descriptor_pairs_classical(kp1, kp2):
     # Find pairs of keypoints of two fragments with similar descriptors
     # Input: kp (keypoints struct), index fragment1, index fragment2
@@ -15,7 +17,7 @@ def get_descriptor_pairs_classical(kp1, kp2):
     gt_dist = []
 
     # Config
-    max_pairs = 30
+    max_pairs = 50
     # Threshold value. Pairs with d>max_d will be discarded
     # Use 0.5 for experiments with Noise. For noise-free datasets use 0.2
     max_d = 0.5
