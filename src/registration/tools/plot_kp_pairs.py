@@ -14,7 +14,7 @@ def create_3d_line(coord1, coord2):
         z=[coord1[2], coord2[2]],
         mode='lines',
         line=dict(
-            width=2,
+            width=5,
             dash='dash',
         )
     )
@@ -60,14 +60,14 @@ def kp_plot(kp1, kp2, pc1, pc2, d_pairs):
         y=down_pcd1[:, 1],
         z=down_pcd1[:, 2],
         mode='markers',
-        marker=dict(size=2, color='blue')
+        marker=dict(size=2, color='blue', opacity=0.6)
     ))
     fig.add_trace(go.Scatter3d(
         x=down_pcd2[:, 0],
         y=down_pcd2[:, 1],
         z=down_pcd2[:, 2],
         mode='markers',
-        marker=dict(size=2, color='red')
+        marker=dict(size=2, color='red', opacity=0.6)
     ))
     # 添加关键点
     fig.add_trace(go.Scatter3d(
@@ -75,18 +75,34 @@ def kp_plot(kp1, kp2, pc1, pc2, d_pairs):
         y=kp1[:, 1],
         z=kp1[:, 2],
         mode='markers',
-        marker=dict(size=5, color='yellow')
+        marker=dict(size=3, color='yellow', opacity=0.8, line=dict(
+                width=2,
+                color='DarkSlateGrey'
+            ))
     ))
     fig.add_trace(go.Scatter3d(
         x=kp2[:, 0],
         y=kp2[:, 1],
         z=kp2[:, 2],
         mode='markers',
-        marker=dict(size=5, color='yellow')
+        marker=dict(size=3, color='yellow', opacity=0.8, line=dict(
+                width=2,
+                color='DarkSlateGrey'
+            ))
     ))
     for pair in d_pairs:
         idx2, idx1 = pair
         coord1 = kp1[idx1]
         coord2 = kp2[idx2]
         fig.add_trace(create_3d_line(coord1, coord2))
+        fig.add_trace(go.Scatter3d(
+            x=[coord1[0], coord2[0]],
+            y=[coord1[1], coord2[1]],
+            z=[coord1[2], coord2[2]],
+            mode='markers',
+            marker=dict(size=7, color='purple', line=dict(
+                width=5,
+                color='black'
+            ))
+        ))
     fig.show()

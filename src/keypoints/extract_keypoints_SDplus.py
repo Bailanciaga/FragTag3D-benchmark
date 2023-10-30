@@ -40,7 +40,6 @@ class Extractor(object):
             lbd_value,
             nms,
             nms_rad,
-            useflags,
             plot_features=False,
     ):
         self.fragment_face = fragment_face
@@ -56,7 +55,6 @@ class Extractor(object):
         self.lbd = lbd_value
         self.nms = nms
         self.nms_rad = nms_rad
-        self.useflags = useflags
         self.plot_features = plot_features
 
     def compute_SD_point(self, neighbourhood, points, normals, p_idx):
@@ -182,7 +180,7 @@ class Extractor(object):
             keypoint_indices = np.argsort(np.abs(SD))[-self.n_keypoints:]
 
         self.keypoints = self.vertices[keypoint_indices]
-        
+
         # Compute the neighbourhoods in all r vals
         neighbourhoods = {}
         H_lut = np.zeros((len(self.r_vals), vertices.shape[0]))
@@ -390,9 +388,9 @@ class Extractor(object):
         fig.show()
 
 
-def f(fragment_face, output_path, num_fts, keypoint_radius, r_vals, n_keypoints, k, lbd, nms, nms_rad, useflags):
+def f(fragment_face, output_path, num_fts, keypoint_radius, r_vals, n_keypoints, k, lbd, nms, nms_rad):
     extractor = Extractor(
-        fragment_face, output_path, num_fts, keypoint_radius, r_vals, n_keypoints, k, lbd, nms, nms_rad, useflags
+        fragment_face, output_path, num_fts, keypoint_radius, r_vals, n_keypoints, k, lbd, nms, nms_rad
     )
     return extractor.extract()
 
@@ -499,7 +497,7 @@ def visualize_matches(extractor1, extractor2, n_points, n_scales, threshold, num
     fig.show()
 
 
-def extract_key_point_by_dir(dataset_dir, n_keypoints, keypoint_radius, r_vals, nms_rad, useflags):
+def extract_key_point_by_dir(dataset_dir, mode):
     fragments = os.listdir(dataset_dir)
     fragments = [x for x in fragments if x.endswith(".npy")]
 
@@ -509,7 +507,6 @@ def extract_key_point_by_dir(dataset_dir, n_keypoints, keypoint_radius, r_vals, 
     k = 200  # the default value of this parameter is 150 [HT is 200]
     lbd = 2  # the default value of this parameter is 2
     nms = True  # the default value of this parameter is True
-    useflags = True
 
     for fragment in fragments:
         print(f"Fragment: {fragment}")
@@ -522,29 +519,54 @@ def extract_key_point_by_dir(dataset_dir, n_keypoints, keypoint_radius, r_vals, 
         fragment = np.load(fragment_path)
         colors = fragment[:, 6:9]
         fragment_kp = np.empty((0, 54))
-        if useflags:
+        if not mode == 3:
             # 创建一个布尔掩码，检查colors中的每一行是否不与[255, 255, 255]相匹配
             mask = ~np.all(colors == [1, 1, 1], axis=1)
             # 使用掩码筛选vertices和normals
             fragment = fragment[mask]
-            unique_colors = np.unique(np.int64(np.round(fragment[:, 6:9] * 255)), axis=0)
-            for color in unique_colors:
-                print("-------Extracting fracture face color is (" + ', '.join(map(str, color)) + ")")  # 打印当前颜色
-                specific_color_mask = np.all(np.isclose(fragment[:, 6:9] * 255, color, atol=1e-5), axis=1)
-                specific_color_fragment_face = fragment[specific_color_mask]
-                # single thread
-                output_matrix = f(specific_color_fragment_face,
-                  output_path,
-                  num_features,
-                  keypoint_radius,
-                  r_vals,
-                  n_keypoints,
-                  k, lbd,
-                  nms,
-                  nms_rad,
-                  useflags)
-                fragment_kp = np.vstack((fragment_kp, output_matrix))
-            np.save(output_path, fragment_kp)
+            if mode == 1:
+                unique_colors = np.unique(np.int64(np.round(fragment[:, 6:9] * 255)), axis=0)
+                for color in unique_colors:
+                    print("-------Extracting fracture face color is (" + ', '.join(map(str, color)) + ")")  # 打印当前颜色
+                    specific_color_mask = np.all(np.isclose(fragment[:, 6:9] * 255, color, atol=1e-5), axis=1)
+                    specific_color_fragment_face = fragment[specific_color_mask]
+                    # single thread
+                    output_matrix = f(specific_color_fragment_face,
+                                      output_path,
+                                      num_features,
+                                      keypoint_radius=0.015,
+                                      r_vals=[0.015, 0.02, 0.03, 0.04, 0.05],
+                                      n_keypoints=512,
+                                      k=200, lbd=2,
+                                      nms=True,
+                                      nms_rad=0.02,
+                                      )
+                    fragment_kp = np.vstack((fragment_kp, output_matrix))
+                np.save(output_path, fragment_kp)
+            if mode == 2:
+                output_matrix = f(fragment,
+                                  output_path,
+                                  num_features,
+                                  keypoint_radius=0.04,
+                                  r_vals=[0.04, 0.05, 0.06, 0.08, 0.10],
+                                  n_keypoints=512,
+                                  k=200, lbd=2,
+                                  nms=0.04,
+                                  nms_rad=0.04
+                                  )
+                np.save(output_path, output_matrix)
+        if mode == 3:
+            output_matrix = f(fragment,
+                              output_path,
+                              num_features,
+                              keypoint_radius=0.04,
+                              r_vals=[0.04, 0.05, 0.06, 0.08, 0.10],
+                              n_keypoints=512,
+                              k=200, lbd=2,
+                              nms=0.04,
+                              nms_rad=0.04)
+            np.save(output_path, output_matrix)
+
 
 import shutil
 

@@ -6,13 +6,14 @@ import os
 
 
 # 对点云添加随机的旋转和平移
-def random_pose_transform(pc, kp):
+def random_pose_transform(pc, kp, seed):
     """
     Apply a random pose transformation to a set of 3D points.
     :param points: Nx3 numpy array of points.
     :return: Transformed Nx3 numpy array of points.
     """
     # Generate a random rotation matrix.
+    np.random.seed(seed)
     angle = np.random.uniform(0, 2 * np.pi)
     axis = np.random.uniform(-1, 1, 3)
     axis = axis / np.linalg.norm(axis)
@@ -44,13 +45,13 @@ def rotation_matrix_from_axis_angle(axis, angle):
     return rotation_matrix
 
 
-def apply_transform(pcpath, kppath):
+def apply_transform(pcpath, kppath, seed):
     pcdata = np.load(pcpath)
     kpdata = np.load(kppath)
     pc_coordinates = pcdata[:, :3]
     kp_coordinates = kpdata[:, :3]
     transformed_pc_coordinates, transformed_kp_coordinates, transform_matrix = random_pose_transform(pc_coordinates,
-                                                                                                     kp_coordinates)
+                                                                                                     kp_coordinates,seed)
     pcdata[:, :3] = transformed_pc_coordinates
     kpdata[:, :3] = transformed_kp_coordinates
     return pcdata, kpdata, transform_matrix

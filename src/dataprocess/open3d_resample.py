@@ -28,8 +28,6 @@ Fragments with <1000 points after downsampling won't get downsampled
 # #output_folder = f"{root}/npy"  # will be generated for output
 # input_folder = f"/home/suhaot/PycharmProjects/3d-fracture-reassembly/dataset/TUWien"
 # output_folder = f"/home/suhaot/PycharmProjects/3d-fracture-reassembly/dataset_kp/TUWien_seg"
-every_k_points = 2
-
 
 # def convert_pointclouds(input_folder, output_folder):
 #     """
@@ -44,7 +42,7 @@ every_k_points = 2
 plot_npy = False
 
 
-def collect_pointclouds(inputpath):
+def collect_pointclouds(inputpath, every_k_points):
     """
     convert and save all pointcloud data from a single folder
     """
@@ -80,9 +78,10 @@ def collect_pointclouds(inputpath):
     if scale < 0.01:
         assert f"SCALE TOO SMALL -- Folder: {inputpath}"
 
-    return _downsample_and_save(inputpath, pc_dict, scale)
+    return _downsample_and_save(inputpath, pc_dict, every_k_points, scale)
 
-def _downsample_and_save(inputpath, pc_dict, scale=2):
+
+def _downsample_and_save(inputpath, pc_dict, every_k_points, scale=2):
     """
     helper for downsamplng and plotting
     """

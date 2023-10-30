@@ -17,10 +17,10 @@ def get_descriptor_pairs_classical(kp1, kp2):
     gt_dist = []
 
     # Config
-    max_pairs = 50
+    max_pairs = 30
     # Threshold value. Pairs with d>max_d will be discarded
     # Use 0.5 for experiments with Noise. For noise-free datasets use 0.2
-    max_d = 0.5
+    max_d = 0.8
     # Parameters for Descriptor
     desc_features = 3  # No of geometric features (3 or 7)
     desc_scales = 5  # (No of radii (multi-scale))

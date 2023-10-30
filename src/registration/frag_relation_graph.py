@@ -4,6 +4,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import itertools
 # folder_path = '../../data/TUWien/brick'
+
+
 def read_ply_color(filepath):
     pcd = o3d.io.read_point_cloud(filepath)
     colors = set()
@@ -14,6 +16,7 @@ def read_ply_color(filepath):
             colors.add((r, g, b))
 
     return colors
+
 
 def create_graph(folder_path):
     graph = nx.Graph()
@@ -43,14 +46,14 @@ def create_graph(folder_path):
 
     # Create a list of edge colors in the order of graph.edges()
     edge_colors = [edge_color_map.get(tuple(sorted(edge)), 'gray') for edge in graph.edges()]
-
+    edge_count = graph.number_of_edges()
 
     # Draw the graph
-    pos = nx.spring_layout(graph)
-    nx.draw_networkx_nodes(graph, pos)
-    nx.draw_networkx_labels(graph, pos)
-    nx.draw_networkx_edges(graph, pos, edge_color=edge_colors, width=4)
-    plt.show()
-    return graph, ply_files, edge_color_map
+    # pos = nx.spring_layout(graph)
+    # nx.draw_networkx_nodes(graph, pos)
+    # nx.draw_networkx_labels(graph, pos)
+    # nx.draw_networkx_edges(graph, pos, edge_color=edge_colors, width=4)
+    # plt.show()
+    return graph, ply_files, edge_color_map, edge_count
 # if __name__ == '__main__':
 #     create_graph(folder_path)

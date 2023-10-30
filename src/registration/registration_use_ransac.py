@@ -52,7 +52,7 @@ def assy_use_ransac(kp1, kp2, d_pairs, d_dist):
             print(y)
 
         matching_pairwise = {}
-        if x - y >= 5:
+        if x > 1:
             if print_flag:
                 print('Valid solution for T_ransac')
 
