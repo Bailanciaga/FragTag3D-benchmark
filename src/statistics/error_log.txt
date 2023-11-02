@@ -1,0 +1,14 @@
+2023-11-02 15:56:49,850 - Failed to analyze PLY file ../../data/FragTag3D/56630/56630_5_seed_0/56630_shard_3.ply: element 'vertex': row 12620: property 'red': malformed input
+2023-11-02 16:18:23,924 - Failed to analyze PLY file ../../data/FragTag3D/78738/78738_5_seed_0/78738_3.ply: 'ascii' codec can't decode byte 0xff in position 0: ordinal not in range(128)
+2023-11-02 16:19:18,810 - Failed to analyze PLY file ../../data/FragTag3D/78738/78738_5_seed_1/78738_5.ply: line 1: expected 'ply'
+2023-11-02 16:19:28,759 - Failed to analyze PLY file ../../data/FragTag3D/78738/78738_5_seed_1/78738_4.ply: line 1: expected 'ply'
+2023-11-02 16:43:59,427 - Failed to analyze PLY file ../../data/FragTag3D/75653/75653_5_seed_2/75653_shard_2.ply: element 'vertex': row 13291: property 'y': early end-of-line
+2023-11-02 16:46:20,546 - Failed to analyze PLY file ../../data/FragTag3D/75657/75657_5_seed_3/75657_shard_3.ply: element 'vertex': row 7529: expected end-of-line
+2023-11-02 16:47:13,924 - Failed to analyze PLY file ../../data/FragTag3D/78737/78737_5_seed_3/78737_4.ply: 'ascii' codec can't decode byte 0x9b in position 1: ordinal not in range(128)
+2023-11-02 16:56:44,302 - Failed to analyze PLY file ../../data/FragTag3D/37620/37620_5_seed_2/37620_shard_0.ply: line 1: expected 'ply'
+2023-11-02 16:57:05,034 - Failed to analyze PLY file ../../data/FragTag3D/37620/37620_5_seed_1/37620_shard_2.ply: element 'vertex': row 92385: property 'ny': malformed input
+2023-11-02 17:48:06,554 - Failed to analyze PLY file ../../data/FragTag3D/46780/46780_5_seed_2/46780_shard_3.ply: element 'vertex': row 1434: expected end-of-line
+2023-11-02 19:36:36,170 - Failed to analyze PLY file ../../data/FragTag3D/56630/56630_5_seed_0/56630_shard_3.ply: element 'vertex': row 12620: property 'red': malformed input
+2023-11-02 20:00:09,888 - Failed to analyze PLY file ../../data/FragTag3D/78738/78738_5_seed_0/78738_3.ply: 'ascii' codec can't decode byte 0xff in position 0: ordinal not in range(128)
+2023-11-02 20:01:08,481 - Failed to analyze PLY file ../../data/FragTag3D/78738/78738_5_seed_1/78738_5.ply: line 1: expected 'ply'
+2023-11-02 20:01:19,044 - Failed to analyze PLY file ../../data/FragTag3D/78738/78738_5_seed_1/78738_4.ply: line 1: expected 'ply'

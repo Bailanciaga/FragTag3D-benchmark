@@ -34,7 +34,6 @@ def dowmSample_and_extract(inputpath, method, params=None):
     else:
         output_path = open3d_resample.collect_pointclouds(inputpath, every_k_points=2)
     print("Extracting Key Points...")
-    # TODO change the file address to windows format
     if method == 'SD+':
         extract_keypoints_SDplus.extract_key_point_by_dir(output_path, mode)
     else:
@@ -75,7 +74,7 @@ def npy_visualization(pc_data, kp_data):
 
 
 # 加载之前保存的数据
-graph, ply_files_dict, edge_color_map, _ = frg.create_graph(inputpath)
+graph, ply_files_dict, edge_color_map, _, _ = frg.create_graph(inputpath)
 
 # 使用DFS创建生成树
 dfs_tree = nx.dfs_tree(graph)
